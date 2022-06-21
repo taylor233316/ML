@@ -1,0 +1,440 @@
+# -*- coding: utf-8 -*-
+# Todo: 得到线段经过哪些网格，返回网格的序号
+# @Time    : 2022/5/15 21:20
+# @Author  : chen
+# @File    : 4_get_pass_grid.py
+# @Software: PyCharm
+import numpy as np
+import math
+# from pylab import *
+import matplotlib.pyplot as plt
+import sympy
+from numpy import polyfit
+
+from road_prediction.basic_method.grid_basic import get_grid_id
+from road_prediction.util.seg import Seg
+
+# class Inline:
+#     def __init__(self, A, B):
+#         self.A = A
+#         self.B = B
+#         # aaa=self.main()
+#
+#     def line_func(self):
+#         a = self.B[1] - self.A[1]
+#         b = self.A[0] - self.B[0]
+#         c = self.B[0] * self.A[1] - self.A[0] * self.B[1]
+#         return a, b, c
+#
+#     # 这个就是转置坐标的函数
+#     def con_ij(self, dot):
+#         dd = [dot[1], dot[0]]
+#         return dd
+#
+#     def cha_m(self):
+#         if self.A[0] > self.B[0] and self.A[1] > self.B[1]:
+#             return self.B, self.A
+#         else:
+#             return self.A, self.B
+#
+#     def d_line(self):
+#         self.A, self.B = self.con_ij(self.A), self.con_ij(self.B)
+#         x = np.linspace(self.A[0], self.B[0], 50)
+#         abc = self.line_func()
+#         y = (abc[0] * x + abc[2]) / (-abc[1])
+#         # 每次都以0.5的位置去标点
+#         i = np.arange(0.5, 15.5, 0.5)  # 横着的坐标
+#         j = np.arange(0.5, 15.5, 0.5)  # 竖着的坐标
+#         plt.xticks(i)
+#         plt.yticks(j)
+#         plt.plot(x, y)
+#
+#     # 上升的直线
+#     def upin_line(self):
+#         open = []
+#
+#         abc = self.line_func()  # ax+by+c，a,b,c三个参数依次在结果中
+#         self.A, self.B = self.con_ij(self.A), self.con_ij(self.B)
+#         tan_theta = (self.B[0] - self.A[0]) / (self.B[1] - self.A[1])
+#         if tan_theta < 1:  # 这是上升曲线
+#             open.append(self.B)
+#             # 小于就用纵向，点和点之间隔了几个格子，就把几个格子加入open表
+#             x = [i for i in range(self.A[0], self.B[0] + 2)]
+#             # print(x,len(x))
+#             y = [(abc[1] * i + abc[2]) / (-abc[0]) for i in x]  # 这个y的公式实际要换成x的公式，因为x，y翻转了
+#             # print(y,len(y))
+#             for i in range(1, len(x)):
+#                 if i != 1:
+#                     num = math.ceil(y[i]) - math.floor(y[i - 1] - 0.001)  # 只在线是单增的情况适用
+#                 else:
+#                     num = math.ceil(y[i]) - math.floor(y[i - 1])
+#                 for j in range(num):
+#                     open.append([x[i - 1], math.ceil(y[i]) - j - 1])
+#             # 这些if语句以及下面这些if语句肯定是可以改进的，这是在具体实践过程中发现有些点奇奇怪怪的也在路径里面，可以改进成遇到起始点和初始点就停止往open表里添加元素。当然现在也能用。。。
+#             if [self.B[0], self.B[1] + 1] in open:
+#                 open.remove([self.B[0], self.B[1] + 1])
+#             if [self.B[0], self.B[1] + 2] in open:
+#                 open.remove([self.B[0], self.B[1] + 2])
+#             if [self.B[0], self.B[1] + 3] in open:
+#                 open.remove([self.B[0], self.B[1] + 3])
+#             if [self.B[0], self.B[1] + 4] in open:
+#                 open.remove([self.B[0], self.B[1] + 4])
+#         # 大于用的是横向，一样的思路.
+#         elif tan_theta > 1:
+#             open.append(self.B)
+#             # x=[i for i in range(self.A[1]-1,self.B[1]+2)]
+#             x = np.arange(self.A[1] - 0.5, self.B[1] + 1, 1)
+#             # print(x)
+#             y = [(abc[0] * i + abc[2]) / (-abc[1]) for i in x]
+#             # print(y)
+#             for i in range(len(x)):
+#                 if i != 0:
+#                     num = math.ceil(y[i]) - math.floor(y[i - 1] - 0.001)
+#                     for j in range(num):
+#                         open.append([math.floor(y[i] - 0.001) - j, math.floor(x[i])])
+#             # 待改进的if语句
+#             if [self.A[0] - 1, self.A[1]] in open:
+#                 open.remove([self.A[0] - 1, self.A[1]])
+#             if [self.A[0] - 2, self.A[1]] in open:
+#                 open.remove([self.A[0] - 2, self.A[1]])
+#             if [self.A[0] - 3, self.A[1]] in open:
+#                 open.remove([self.A[0] - 3, self.A[1]])
+#             if [self.A[0] - 4, self.A[1]] in open:
+#                 open.remove([self.A[0] - 4, self.A[1]])
+#             if [self.B[0] + 1, self.B[1]] in open:
+#                 open.remove([self.B[0] + 1, self.B[1]])
+#             if [self.B[0] + 2, self.B[1]] in open:
+#                 open.remove([self.B[0] + 2, self.B[1]])
+#             if [self.B[0] + 3, self.B[1]] in open:
+#                 open.remove([self.B[0] + 3, self.B[1]])
+#             if [self.B[0] + 4, self.B[1]] in open:
+#                 open.remove([self.B[0] + 4, self.B[1]])
+#         # 这个else是当它正好斜对角的时候
+#         else:
+#             open.append(self.A)
+#             open.append(self.B)
+#             i = 0
+#             while i < self.B[1] - self.A[1]:
+#                 open.append([self.A[0] + i, self.A[1] + i])
+#                 i += 1
+#         # print(open)
+#         return open
+#
+#     # 这个就是下降的线条了，按理说应该要是对称的
+#     def dnin_line(self):
+#         open = []
+#         abc = self.line_func()
+#         # print((abc[1]*8.5+abc[2])/(-abc[0]))
+#         tan_theta = (self.B[0] - self.A[0]) / (self.A[1] - self.B[1])
+#         # print(tan_theta)
+#         # print(self.A,self.B)
+#         self.A, self.B = self.con_ij(self.A), self.con_ij(self.B)
+#         # print(self.A,self.B)
+#         # print(A[0]+1,A[1])
+#         open.append(self.A)
+#         open.append(self.B)
+#         # 如果角度是45度，那么就应该是比较竖的直线
+#         if tan_theta < 1:
+#             # 画了图之后，应该是画竖格子
+#             x = np.arange(self.A[1] - 0.5, self.B[1] + 1, 1)
+#             # print(x)
+#             y = [(abc[0] * j + abc[2]) / (-abc[1]) for j in x]
+#             # print(y)
+#             for i in range(len(x) - 1):
+#                 num = (round(y[i]) + 0.5) - (round(y[i + 1]) - 0.5)
+#                 # print(num)
+#                 # print(round(y[i])+0.5,(round(y[i+1])-0.5))
+#                 for j in range(int(num)):
+#                     open.append([int(round(y[i])) - j, math.ceil(x[i])])
+#             # 待改进的if语句
+#             if [self.A[0] + 1, self.A[1]] in open:
+#                 open.remove([self.A[0] + 1, self.A[1]])
+#             if [self.B[0] - 1, self.B[1]] in open:
+#                 open.remove([self.B[0] - 1, self.B[1]])
+#         elif tan_theta > 1:
+#             # 这里就应该是画横格子
+#             # print(self.A[0],self.B[0])
+#             x = np.arange(self.B[0] - 0.5, self.A[0] + 1 + 0.5)
+#             y = [(abc[1] * j + abc[2]) / (-abc[0]) for j in x]
+#             for i in range(len(x) - 1):
+#                 num = (round(y[i]) + 0.5) - (round(y[i + 1]) - 0.5)
+#                 for j in range(int(num)):
+#                     open.append([math.ceil(x[i]), int(round(y[i])) - j])
+#             if [self.A[0], self.A[1] - 1] in open:
+#                 open.remove([self.A[0], self.A[1] - 1])
+#             if [self.B[0], self.B[1] + 1] in open:
+#                 open.remove([self.B[0], self.B[1] + 1])
+#             if [self.B[0], self.B[1] + 2] in open:
+#                 open.remove([self.B[0], self.B[1] + 2])
+#             if [self.B[0], self.B[1] + 3] in open:
+#                 open.remove([self.B[0], self.B[1] + 3])
+#         return open
+#
+#     # 如果直线是横线
+#     def hen_line(self):
+#         open = []
+#         # print(self.B[0]-self.A[0])
+#         for i in range(self.B[0] - self.A[0]):
+#             open.append([self.B[1], self.A[0] + i])
+#         open.append([self.B[1], self.B[0]])
+#         return open
+#
+#     # 这段是如果直线是竖线
+#     def shu_line(self):
+#         open = []
+#         for i in range(self.B[1] - self.A[1]):
+#             open.append([self.A[1] + i, self.A[0]])
+#         open.append([self.B[1], self.B[0]])
+#         return open
+#
+#     def main(self):
+#         if self.A[0] < self.B[0] and self.A[1] < self.B[1]:
+#             # 都是小于的就用上升的情况
+#             open = self.upin_line()
+#         elif self.A[0] > self.B[0] and self.A[1] > self.B[1]:
+#             # 都大于那就转换一下坐标，然后用上升
+#             self.A, self.B = self.B, self.A
+#             open = self.upin_line()
+#         elif self.A[0] < self.B[0] and self.A[1] > self.B[1]:
+#             # 这里就是用下降了
+#             open = self.dnin_line()
+#         elif self.A[0] > self.B[0] and self.A[1] < self.B[1]:
+#             self.A, self.B = self.B, self.A
+#             open = self.dnin_line()
+#         elif self.A[1] == self.B[1]:
+#             open = self.hen_line()
+#         else:
+#             open = self.shu_line()
+#
+#         return open
+#
+
+map_grid = np.full((15, 15), int(10), dtype=np.int8)
+
+
+def m_show(mat, color):
+    for item in mat:
+        map_grid[item[0], item[1]] = color
+    return map_grid
+
+
+def xxx_y(x, y):
+    x1 = []
+    y1 = []
+    x1.append(x[0]);
+    x1.append(y[0])
+    y1.append(x[1]);
+    y1.append(y[1])
+    return x1, y1
+
+
+# def get_pass_grid(x, y):
+#     aaa = Inline(x, y)
+#     open = aaa.main()
+#     print(open)
+#     m_show(open, 5)
+#     # 以下这段就可以规定坐标轴的方向
+#     plt.xlim(-1, 15)  # 设置x轴范围
+#     plt.ylim(15, -1)  # 设置y轴范围
+#     my_x_ticks = np.arange(0, 15, 1)
+#     my_y_ticks = np.arange(0, 15, 1)
+#     plt.xticks(my_x_ticks)
+#     plt.yticks(my_y_ticks)
+#     xy = xxx_y(x, y)
+#     print(xy)
+#     plt.plot(xy[0], xy[1])
+#     plt.imshow(map_grid, cmap=plt.cm.hot, interpolation='nearest', vmin=0, vmax=10)
+#     plt.grid(True)
+#     plt.show()
+
+
+def L(x, SP):
+    L_res = math.sqrt((SP[x, 0] - SP[x - 1, 0]) ** 2 + (SP[x, 1] - SP[x - 1, 1]) ** 2)
+    return L_res
+
+
+def calLength(P1, P2):
+    segs = []
+    grid_id = []
+    P1_x = P1[0]
+    P1_y = P1[1]
+    P2_x = P2[0]
+    P2_y = P2[1]
+
+    x_min = min(P1_x, P2_x)
+    y_min = min(P1_y, P2_y)
+    x_max = max(P1_x, P2_x)
+    y_max = max(P1_y, P2_y)
+    if P1_x == P2_x and (round(P1_x) == P1_x) or (P1_y == P2_y) and (round(P1_y) == P1_y):
+        return
+
+    pos = np.arange(1, 101).reshape(10, 10)
+    print("pos:", pos)
+
+    if (P1_x == P2_x) and (round(P1_x) != P1_x):
+        SP = np.unique([y_min, y_max, np.arange(math.ceil(y_min), math.floor(y_max) + 1)])
+        print("SP:", SP)
+        for t in range(1, np.size(SP, 1)):
+            seg = Seg(t)
+            length = SP[t] - SP[t - 1]
+            index_x = math.ceil(P1_x)
+            index_y = max(math.ceil(SP[t]), math.ceil(SP[t - 1]))
+            # index = pos(index_x, index_y)
+            id = get_grid_id(index_x, index_y)
+            seg.set_seg(length, index_x, index_y, id)
+            segs.append(seg)
+
+    if P1_x != P2_x:
+        K = polyfit([P1_x, P2_x], [P1_y, P2_y], 1)
+        print("K:", K)
+        xpx = []
+        xpy = []
+        for i in range(math.ceil(x_min), math.floor(x_max) + 1):
+            xpx.append(i)
+            xpy.append(K[0] * i + K[1])
+        print("xpx:", xpx)
+        print("xpy:", xpy)
+
+        ypx = []
+        ypy = []
+        for j in range(math.ceil(y_min), math.floor(y_max) + 1):
+            ypy.append(j)
+            x = sympy.Symbol('x')
+            ypx.append(float(sympy.solve(K[0] * x + K[1] - j, x)[0]))
+        print("ypy:", ypy)
+        print("ypx:", ypx)
+
+        # ypx[j - math.ceil(y_min) + 1] = float(sympy.solve(K[1] * x + K[2] - j, x))
+
+        row1 = [P1_x, P2_x]
+        row1.extend(xpx)
+        row1.extend(ypx)
+
+        row2 = [P1_y, P2_y]
+        row2.extend(xpy)
+        row2.extend(ypy)
+
+        A = np.matrix([row1, row2]).T
+        print("A:", A)
+        SP = np.unique(A, axis=0)
+
+        print("SP:", SP)
+        print("np.size(SP, 1):", SP.shape[0])
+        for t in range(1, SP.shape[0]):
+            seg = Seg(t)
+            length = L(t, SP)
+            index_x = max(math.ceil(SP[t, 0]), math.ceil(SP[t - 1, 0]))
+            index_y = max(math.ceil(SP[t, 1]), math.ceil(SP[t - 1, 1]))
+            print("      *****************       ")
+            print("方格", t)
+            print("index_x:", index_x)
+            print("index_y:", index_y)
+            print("      *****************       \n")
+            index = pos[index_x, index_y]
+            id = get_grid_id(index_x, index_y)
+            seg.set_seg(length, index_x, index_y, id)
+            segs.append(seg)
+            # print(segs)
+
+    grid_id = [seg.id for seg in segs]
+    # print(grid_id)
+
+    return grid_id
+
+    # n = []
+    # for i in range(1, np.size(segs,2))
+    #     if segs(i).length < eps:
+    #         n = [n i]
+    #
+    # segs(n) = []
+
+
+def calLineCrossPt(pt11, pt12, pt21, pt22):
+    [x1, y1] = pt11
+    [x2, y2] = pt12
+    [x3, y3] = pt21
+    [x4, y4] = pt22
+    x0 = -10
+    y0 = -10
+
+    if abs((x3 - x4) * (y1 - y2) - (x1 - x2) * (y3 - y4)) > np.spacing(20):
+        x0 = ((x3 - x4) * (x2 * y1 - x1 * y2) - (x1 - x2) * (x4 * y3 - x3 * y4)) / \
+             ((x3 - x4) * (y1 - y2) - (x1 - x2) * (y3 - y4))
+        y0 = ((y3 - y4) * (y2 * x1 - y1 * x2) - (y1 - y2) * (y4 * x3 - y3 * x4)) / \
+             ((y3 - y4) * (x1 - x2) - (y1 - y2) * (x3 - x4))
+    elif abs(y1 - y2) < np.spacing(20):
+        x0 = x1
+        y0 = y1
+    elif abs(x1 - x2) < np.spacing(20):
+        x0 = x1
+        y0 = y1
+
+    pt0 = [x0, y0]
+    return pt0
+
+
+def calDistance2pts(pt1, pt2):
+    return np.sqrt((pt1[0] - pt2[0]) ** 2 + (pt1[1] - pt2[1]) ** 2)
+
+
+def calTwoPointDist(pt1, pt2, x_grid_num, y_grid_num):
+    [x1, y1] = pt1
+    [x2, y2] = pt2
+    xmin = min(x1, x2)
+    xmax = max(x1, x2)
+    ymin = min(y1, y2)
+    ymax = max(y1, y2)
+
+    xcal = range(int(np.ceil(xmin)), int(np.floor(xmax)) + 1)
+    ycal = range(int(np.ceil(ymin)), int(np.floor(ymax)) + 1)
+    pt0 = [[x1, y1], [x2, y2]]
+
+    for xi in xcal:
+        pt00 = calLineCrossPt(pt1, pt2, [xi, ymin], [xi, ymax])
+        pt0.append([xi, pt00[1]])
+    for yi in ycal:
+        pt01 = calLineCrossPt(pt1, pt2, [xmin, yi], [xmax, yi])
+        pt0.append([pt01[0], yi])
+    pt0 = np.unique(pt0, axis=0)
+    print('=======================')
+    print('直线与格网的交点（包含直线首尾端点）')
+    print(pt0)
+
+    ptInd = []
+    gridInd = []
+    dist = []
+    pos = np.array(range(1, x_grid_num * y_grid_num + 1))
+    pos = pos.reshape((y_grid_num, x_grid_num))
+    for i in range(0, len(pt0) - 1):
+        tmpDist = np.sqrt((pt0[i][0] - pt0[i + 1][0]) ** 2 + (pt0[i][1] - pt0[i + 1][1]) ** 2)
+        if tmpDist < np.spacing(20):
+            continue
+        dist.append(tmpDist)
+        xind = np.max([int(np.ceil(pt0[i][0])), int(np.ceil(pt0[i + 1][0]))]) - 1
+        yind = np.max([int(np.ceil(pt0[i][1])), int(np.ceil(pt0[i + 1][1]))]) - 1
+        ptInd.append([xind, yind])
+        print("xind:", xind, ",yind:", yind)
+        gridInd.append(pos[yind][xind])
+
+    return [gridInd, dist]
+
+
+if __name__ == '__main__':
+    P1 = [3.2, 2]
+    P2 = [7.5, 8.2]
+    point1 = [3.2, 2]
+    point2 = [7.5, 8.2]
+    x_grid_num = 1157
+    y_grid_num = 912
+
+    [gridInd, gridDist] = calTwoPointDist(point1, point2, x_grid_num, y_grid_num)
+    print('======================')
+    print('直线穿过以下编号的格子：')
+    print(gridInd)
+
+    # grid_id = calLength(P1, P2)
+    # print(grid_id)
+#     #
+#     x = [8, 9]
+#     y = [3, 2]
+#     get_pass_grid(x, y)
